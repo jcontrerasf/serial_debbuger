@@ -17,6 +17,7 @@ class serial_debug:
         self.started = False
         self.filename = ""
         self.memory = {}
+        self.run = False
 
 
     def start(self):
@@ -38,34 +39,46 @@ class serial_debug:
         self.started = False
 
     def run(self):
-        self.ser = serial.Serial(input_puerto.get(), input_baud.get(), rtscts=True)
+        self.ser = serial.Serial(input_puerto.get(), input_baud.get())
         if not self.ser.is_open:
             self.ser.open()
         print_gui("Esperando cpu_ready")
         self.ser.write(b'\x00\x01')
         self.wait_cpu_ready()
 
-    def start_debug(self):
-        pass
+    
 
     def step_debug(self):
         boton_step.configure(state=DISABLED)
         self.ser.write(b'\x00\x02')
         if self.started:
             addr = int.from_bytes(self.ser.read(4)[:4], byteorder='big', signed=False)
-            print_gui("Dirección recibida: " + str(addr))
             self.ser.reset_input_buffer()
         enviar_instruccion(addr, self.memory, self.ser)
         self.wait_cpu_ready()
+
+    def run_debug(self):
+        boton_run.configure(state=DISABLED)
+        boton_pause.configure(state=NORMAL)
+        self.run = True
+        threading.Thread(target=self._run_debug).start()
+
+    def _run_debug(self):
+        while self.run:
+            self.step_debug
+
+    def pause_debug(self):
+        boton_run.configure(state=NORMAL)
+        boton_pause.configure(state=DISABLED)
+        self.run = False
+        
 
     def wait_cpu_ready(self):
         while self.started:
             if self.ser.read(1) == CPU_READY:
                 boton_step.configure(state=NORMAL)
+                boton_run.configure(state=NORMAL)
                 break
-
-    def stop_debug(self):
-        pass
 
 
     def select_file(self):
@@ -192,14 +205,15 @@ frame_send = tk.LabelFrame(root, padx=10, pady=10, text="Steps")
 frame_send.grid(row=2, column=0)
 
 
-boton_start = tk.Button(frame_send, padx=10, text="Start", command=sd.start_debug)
-boton_start.grid(row=0, padx=10, column=0)
 
 boton_step = tk.Button(frame_send, padx=10, text="Step", state=DISABLED, command=sd.step_debug)
-boton_step.grid(row=0, padx=50, column=1)
+boton_step.grid(row=0, padx=10, column=0)
 
-boton_stop = tk.Button(frame_send, padx=10, text="Stop", command=sd.stop_debug)
-boton_stop.grid(row=0, padx=10, column=2)
+boton_run = tk.Button(frame_send, padx=10, text="Run", state=DISABLED, command=sd.run_debug)
+boton_run.grid(row=0, padx=50, column=1)
+
+boton_pause = tk.Button(frame_send, padx=10, text="Pause", state=DISABLED, command=sd.pause_debug)
+boton_pause.grid(row=0, padx=10, column=2)
 
 frame_out = tk.LabelFrame(root, relief=tk.GROOVE, text="Salida")
 frame_out.grid(row=3, column=0)
