@@ -53,6 +53,7 @@ class serial_debug:
         self.ser.write(b'\x00\x02')
         while self.started:
             addr = int.from_bytes(self.ser.read(4)[:4], byteorder='little', signed=False)
+            print_gui("Instrucción recibida: " + str(addr))
             self.ser.reset_input_buffer()
             if addr:
                 break
