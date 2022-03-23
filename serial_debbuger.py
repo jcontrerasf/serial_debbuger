@@ -52,11 +52,11 @@ class serial_debug:
         boton_step.configure(state=DISABLED)
         self.ser.write(b'\x00\x02')
         addr = 0
+        self.ser.reset_input_buffer()
         while self.started:
-            if self.ser.in_waiting:
-                addr = int.from_bytes(self.ser.read(4)[:4], byteorder='little', signed=False)
-                print_gui("Dirección recibida: " + str(addr))
-                self.ser.reset_input_buffer()
+            addr = int.from_bytes(self.ser.read(4)[:4], byteorder='little', signed=False)
+            print_gui("Dirección recibida: " + str(addr))
+            self.ser.reset_input_buffer()
             if addr:
                 break
         enviar_instruccion(addr, self.memory, self.ser)
