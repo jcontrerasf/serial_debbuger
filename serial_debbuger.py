@@ -9,6 +9,8 @@ from tkinter.font import NORMAL
 from tkinter import filedialog as fd
 import threading
 
+CPU_READY = b'\x03'
+
 
 class serial_debug:
     def __init__(self):
@@ -36,14 +38,35 @@ class serial_debug:
         self.started = False
 
     def run(self):
-        ser = serial.Serial(input_puerto.get(), input_baud.get(), rtscts=True)
-        if not ser.is_open:
-            ser.open()
-        print_gui("Running...")
+        self.ser = serial.Serial(input_puerto.get(), input_baud.get(), rtscts=True)
+        if not self.ser.is_open:
+            self.ser.open()
+        print_gui("Esperando cpu_ready")
+        self.ser.write(b'\x00\x01')
+        self.wait_cpu_ready()
+
+    def start_debug(self):
+        pass
+
+    def step_debug(self):
+        boton_step.configure(state=DISABLED)
+        self.ser.write(b'\x00\x02')
         while self.started:
-            addr = int.from_bytes(ser.read(4)[:4], byteorder='little', signed=False)
-            ser.reset_input_buffer()
-            enviar_instruccion(addr, self.memory, ser)
+            addr = int.from_bytes(self.ser.read(4)[:4], byteorder='little', signed=False)
+            self.ser.reset_input_buffer()
+            if addr:
+                break
+        enviar_instruccion(addr, self.memory, self.ser)
+        self.wait_cpu_ready()
+
+    def wait_cpu_ready(self):
+        while self.started:
+            if self.ser.read(1) == CPU_READY:
+                boton_step.configure(state=NORMAL)
+                break
+
+    def stop_debug(self):
+        pass
 
 
     def select_file(self):
@@ -173,7 +196,7 @@ frame_send.grid(row=2, column=0)
 boton_start = tk.Button(frame_send, padx=10, text="Start", command=sd.start_debug)
 boton_start.grid(row=0, padx=10, column=0)
 
-boton_step = tk.Button(frame_send, padx=10, text="Step", command=sd.step_debug)
+boton_step = tk.Button(frame_send, padx=10, text="Step", state=DISABLED, command=sd.step_debug)
 boton_step.grid(row=0, padx=50, column=1)
 
 boton_stop = tk.Button(frame_send, padx=10, text="Stop", command=sd.stop_debug)
