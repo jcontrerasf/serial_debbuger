@@ -11,16 +11,15 @@ import threading
 
 CPU_READY = b'\x03'
 
-
 class serial_debug:
     def __init__(self):
         self.started = False
         self.filename = ""
         self.memory = {}
-        self.run = False
+        self.running = False
 
 
-    def start(self):
+    def conectar(self):
         self.started = True
         if self.filename == "":
             messagebox.showerror(message="Primero debes seleccionar un archivo.", title="Selecciona un archivo")
@@ -43,9 +42,9 @@ class serial_debug:
         if not self.ser.is_open:
             self.ser.open()
         print_gui("Esperando cpu_ready")
+        label_estado.config(text= "Esperando cpu_ready")
         self.ser.write(b'\x00\x01')
         self.wait_cpu_ready()
-
     
 
     def step_debug(self):
@@ -60,17 +59,17 @@ class serial_debug:
     def run_debug(self):
         boton_run.configure(state=DISABLED)
         boton_pause.configure(state=NORMAL)
-        self.run = True
+        self.running = True
         threading.Thread(target=self._run_debug).start()
 
     def _run_debug(self):
-        while self.run:
-            self.step_debug
+        while self.running:
+            self.step_debug()
 
     def pause_debug(self):
         boton_run.configure(state=NORMAL)
         boton_pause.configure(state=DISABLED)
-        self.run = False
+        self.running = False
         
 
     def wait_cpu_ready(self):
@@ -130,10 +129,6 @@ def rescan():
     if puertos:
         input_puerto.current(0)
 
-def clear():
-    out_text.configure(state=NORMAL)
-    out_text.delete("1.0", tk.END)
-    out_text.configure(state=DISABLED)
 
 def print_gui(text, new_line = True):
     out_text.configure(state=NORMAL)
@@ -143,31 +138,22 @@ def print_gui(text, new_line = True):
     out_text.configure(state=DISABLED)
     out_text.see("end")
 
+def clear():
+    out_text.configure(state=NORMAL)
+    out_text.delete("1.0", tk.END)
+    out_text.configure(state=DISABLED)
+
 def enviar_instruccion(addr, memory, fpgaData):
-    for i in range(8):
-        if(i==0):
-            fpgaData.write(b'\x01')
-        elif(i==1):
-            fpgaData.write(bytearray(memory[addr][3]))
-        elif(i==2):
-            fpgaData.write(b'\x02')
-        elif(i==3):
-            fpgaData.write(bytearray(memory[addr][2]))
-        elif(i==4):
-            fpgaData.write(b'\x03')
-        elif(i==5):
-            fpgaData.write(bytearray(memory[addr][1]))
-        elif(i==6):
-            fpgaData.write(b'\x04')
-        elif(i==7):
-            fpgaData.write(bytearray(memory[addr][0]))
+    for i in range(4):
+        fpgaData.write(i+1)
+        fpgaData.write(bytearray(memory[addr][i-3]))
 
 
 puertos = serial_ports()
 root = tk.Tk()
 root.title("Serial debugger")
 #root.iconbitmap("logo.ico")
-root.geometry("740x550")
+root.geometry("750x550")
 
 frame_conf = tk.LabelFrame(root, relief=tk.GROOVE, padx=10, pady=10, text="Configuración")
 frame_conf.grid(row=0, column=0)
@@ -194,43 +180,52 @@ input_baud = ttk.Combobox(frame_conf, state="readonly", values=["9600",
 input_baud.grid(row=0, column=5)
 input_baud.current(0)
 
-boton_conectar = tk.Button(frame_conf, text="Conectar", command=sd.start)
+boton_conectar = tk.Button(frame_conf, text="Conectar", command=sd.conectar)
 boton_conectar.grid(row=0, column=6)
 
 label_file = tk.Label(frame_conf, text="Archivo: *Debes elegir un archivo*")
-label_file.grid(row = 1, column = 0, columnspan=6)
+label_file.grid(row = 1, column = 0, columnspan=5)
+
+boton_stop = tk.Button(frame_conf, text="Detener", command=sd.stop)
+boton_stop.grid(row=1, column=6)
 
 
-frame_send = tk.LabelFrame(root, padx=10, pady=10, text="Steps")
-frame_send.grid(row=2, column=0)
+frame_steps = tk.LabelFrame(root, padx=10, pady=10, text="Steps")
+frame_steps.grid(row=2, column=0)
 
 
 
-boton_step = tk.Button(frame_send, padx=10, text="Step", state=DISABLED, command=sd.step_debug)
+boton_step = tk.Button(frame_steps, padx=10, text="Step", state=DISABLED, command=sd.step_debug)
 boton_step.grid(row=0, padx=10, column=0)
 
-boton_run = tk.Button(frame_send, padx=10, text="Run", state=DISABLED, command=sd.run_debug)
+boton_run = tk.Button(frame_steps, padx=10, text="Run", state=DISABLED, command=sd.run_debug)
 boton_run.grid(row=0, padx=50, column=1)
 
-boton_pause = tk.Button(frame_send, padx=10, text="Pause", state=DISABLED, command=sd.pause_debug)
+boton_pause = tk.Button(frame_steps, padx=10, text="Pause", state=DISABLED, command=sd.pause_debug)
 boton_pause.grid(row=0, padx=10, column=2)
 
-frame_out = tk.LabelFrame(root, relief=tk.GROOVE, text="Salida")
-frame_out.grid(row=3, column=0)
+frame_estado = tk.LabelFrame(frame_steps, relief=tk.GROOVE, text="Estado")
+frame_estado.grid(row=3, column=0, sticky="WE", columnspan=3, pady=(20,0))
 
-boton_stop = tk.Button(frame_out, text="Detener", command=sd.stop)
-boton_stop.grid(row=0, column=0)
+label_estado = tk.Label(frame_estado, text="No iniciado")
+label_estado.grid(row = 0, column = 0, padx=20, pady=20)
 
-boton_clear = tk.Button(frame_out, text="Limpiar salida", command=clear)
-boton_clear.grid(row=0, column=1)
+
+frame_out = tk.LabelFrame(root, relief=tk.GROOVE, text="Consola")
+frame_out.grid(row=4, column=0)
+
+boton_clear = tk.Button(frame_out, text="Limpiar", command=clear)
+boton_clear.grid(row=0, column=0)
 
 out_text = scrolledtext.ScrolledText(frame_out,
                                      yscrollcommand=True,
                                      state=DISABLED, 
                                      font= ("Consolas", 10),
                                      width=100,
-                                     height=20)
-out_text.grid(row=1,column=0, columnspan=2)
+                                     height=15)
+out_text.grid(row=1,column=0)
+
+
 
 def on_closing():
     if messagebox.askokcancel("Cerrar", "¿Realmente quieres salir?"):
