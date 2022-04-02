@@ -52,8 +52,25 @@ class serial_debug:
         self.ser.write(b'\x00\x02')
         if self.started:
             addr = int.from_bytes(self.ser.read(4)[:4], byteorder='big', signed=False)
-            self.ser.reset_input_buffer()
-        enviar_instruccion(addr, self.memory, self.ser)
+            #self.ser.reset_input_buffer()
+        #enviar_instruccion(addr, self.memory, self.ser)
+        for i in range(8):
+            if(i==0):
+                self.ser.write(b'\x01')
+            elif(i==1):
+                self.ser.write(bytearray(self.memory[addr][3]))
+            elif(i==2):
+                self.ser.write(b'\x02')
+            elif(i==3):
+                self.ser.write(bytearray(self.memory[addr][2]))
+            elif(i==4):
+                self.ser.write(b'\x03')
+            elif(i==5):
+                self.ser.write(bytearray(self.memory[addr][1]))
+            elif(i==6):
+                self.ser.write(b'\x04')
+            elif(i==7):
+                self.ser.write(bytearray(self.memory[addr][0]))
         self.wait_cpu_ready()
 
     def run_debug(self):
